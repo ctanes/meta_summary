@@ -1,0 +1,103 @@
+---
+title: "Summary of Data"
+author: "CHOP Microbiome Center"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include = FALSE}
+options(qwraps2_markup = "markdown") # needed when variable names contain an underscore (_)
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  cache = FALSE,
+  fig.align = "center"
+  )
+library(tidyverse)
+library(pander)
+library(qwraps2)
+```
+
+```{r study_specific}
+# file path to metadata
+metadata_fp <- "USDA_Run_29_metadata.tsv"
+s0 <- metadata_fp %>%
+  read_tsv()
+var_list <- c("study_group", "study_day", "treatment", "current_antibiotics")
+```
+
+```{r constants}
+# regular expression to filter out lab negative control samples
+neg_ctrl_regex <- c("emptywell", "extractemptywell", "extractblank", "dnafreewater") %>%
+  paste(collapse = "|")
+# regular expression to filter out lab positive control samples
+pos_ctrl_regex <- c("vibriolambda", "geneblock") %>%
+  paste(collapse = "|")
+```
+
+\newpage
+
+# Introduction
+
+```{r}
+# lab negative control samples
+neg_ctrl_sample_id <- s0 %>%
+  filter(str_detect(sample_id, regex(neg_ctrl_regex, ignore_case = T))) %>%
+  pull(sample_id)
+# lab positive control samples
+pos_ctrl_sample_id <- s0 %>%
+  filter(str_detect(sample_id, regex(pos_ctrl_regex, ignore_case = T))) %>%
+  pull(sample_id)
+# metadata excluding lab control samples
+s <- s0 %>%
+  filter(!sample_id %in% c(neg_ctrl_sample_id, pos_ctrl_sample_id)) %>%
+  droplevels()
+```
+
+There are `r nrow(s0)` samples in the metadata, including `r length(neg_ctrl_sample_id)` CHOP Microbiome Center negative control sample(s) and `r length(pos_ctrl_sample_id)` positive control sample(s). This leads to `r nrow(s)` experimental samples. 
+
+\newpage
+
+# Summary table
+
+```{r, results = "asis"}
+s %>%
+  select(var_list) %>% 
+  summary_table()
+```
+
+\newpage
+
+# Figures
+
+```{r, fig.height = 6, results = "asis"}
+panderOptions("knitr.auto.asis", FALSE)
+col_class <- sapply(s, class)
+for (i in 1:length(var_list)) {
+  curr_var <- var_list[i]
+  cat(paste("##", curr_var, "\n"))
+  if(col_class[curr_var] == "numeric") {
+    g <- s %>%
+      ggplot(aes(x = " ", y = get(curr_var))) +
+      geom_boxplot() +
+      labs(x = " ", y = curr_var) +
+      theme_bw() +
+      theme(aspect.ratio = 1)
+    print(g)
+  } else {
+    g <- s %>%
+      ggplot(aes(x = get(curr_var))) +
+      geom_bar() +
+      scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+      labs(x = curr_var) +
+      theme_bw() +
+      theme(aspect.ratio = 1)
+    print(g)
+  }
+  cat("\n\n\\newpage\n")
+}
+```
