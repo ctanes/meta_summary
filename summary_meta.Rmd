@@ -25,8 +25,6 @@ library(qwraps2)
 ```{r study_specific}
 # file path to metadata
 metadata_fp <- "USDA_Run_29_metadata.tsv"
-s0 <- metadata_fp %>%
-  read_tsv()
 var_list <- c("study_group", "study_day", "treatment", "current_antibiotics")
 ```
 
@@ -39,19 +37,48 @@ pos_ctrl_regex <- c("vibriolambda", "geneblock") %>%
   paste(collapse = "|")
 ```
 
+```{r functions}
+# get_figures(s, curr_var) creates either a histogram (when curr_var is numeric) or a bar plot(when curr_var is character)
+get_figure <- function(s, curr_var) {
+  col_class <- sapply(s, class)
+  if(col_class[curr_var] == "numeric") {
+    g <- s %>%
+      ggplot(aes(x = get(curr_var))) +
+      geom_histogram() +
+      labs(x = curr_var) +
+      theme_bw() +
+      theme(aspect.ratio = 1)
+  } else {
+    g <- s %>%
+      ggplot(aes(x = get(curr_var))) +
+      geom_bar() +
+      scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+      labs(x = curr_var) +
+      theme_bw() +
+      theme(aspect.ratio = 1)
+  }
+}
+```
+
 \newpage
 
 # Introduction
 
 ```{r}
+# original metadata
+s0 <- metadata_fp %>%
+  read_tsv()
+
 # lab negative control samples
 neg_ctrl_sample_id <- s0 %>%
   filter(str_detect(sample_id, regex(neg_ctrl_regex, ignore_case = T))) %>%
   pull(sample_id)
+
 # lab positive control samples
 pos_ctrl_sample_id <- s0 %>%
   filter(str_detect(sample_id, regex(pos_ctrl_regex, ignore_case = T))) %>%
   pull(sample_id)
+
 # metadata excluding lab control samples
 s <- s0 %>%
   filter(!sample_id %in% c(neg_ctrl_sample_id, pos_ctrl_sample_id)) %>%
@@ -74,30 +101,13 @@ s %>%
 
 # Figures
 
-```{r, fig.height = 6, results = "asis"}
+```{r, fig.height = 4, results = "asis"}
 panderOptions("knitr.auto.asis", FALSE)
-col_class <- sapply(s, class)
 for (i in 1:length(var_list)) {
   curr_var <- var_list[i]
   cat(paste("##", curr_var, "\n"))
-  if(col_class[curr_var] == "numeric") {
-    g <- s %>%
-      ggplot(aes(x = " ", y = get(curr_var))) +
-      geom_boxplot() +
-      labs(x = " ", y = curr_var) +
-      theme_bw() +
-      theme(aspect.ratio = 1)
-    print(g)
-  } else {
-    g <- s %>%
-      ggplot(aes(x = get(curr_var))) +
-      geom_bar() +
-      scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
-      labs(x = curr_var) +
-      theme_bw() +
-      theme(aspect.ratio = 1)
-    print(g)
-  }
+  g <- get_figure(s, curr_var)
+  print(g)
   cat("\n\n\\newpage\n")
 }
 ```
